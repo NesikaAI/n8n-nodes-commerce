@@ -37,8 +37,8 @@ The node needs a Nesika Developer Project API key.
 3. In n8n, create a **Nesika Commerce API** credential and paste the key.
 
 Leave **Base URL** at `https://api.nesika.ai/api/v1` unless Nesika support gives you another
-URL. The credential sends the key in the `X-API-Key` header. Selecting **Test** reads your
-project identity, which costs nothing.
+URL. The credential sends the key in the `X-API-Key` header. Selecting **Test** reads a job id
+that cannot exist, which costs nothing and proves the key works.
 
 ## Operations
 
