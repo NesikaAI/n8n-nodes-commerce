@@ -1,11 +1,11 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-/** Retailers the Commerce API supports today. */
-const MERCHANT_OPTIONS = [
-	{ name: 'Big W', value: 'BigW' },
-	{ name: 'Bunnings Warehouse', value: 'BunningsWarehouse' },
-	{ name: 'Kmart', value: 'Kmart' },
-];
+/**
+ * Retailer names the API knows. Any retailer website works too, so this list is help text
+ * rather than a closed set.
+ */
+const NAMED_RETAILERS =
+	'"BigW", "Kmart", "BunningsWarehouse", "Coles", "Woolworths", "ChemistWarehouse" or "TheRejectShop"';
 
 const ALL_OPERATIONS = ['search', 'resolve', 'findOffers', 'deepSearch'];
 
@@ -100,8 +100,8 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 		type: 'string',
 		required: true,
 		default: '',
-		placeholder: 'https://www.bigw.com.au/product/example/p/123456',
-		description: 'Product page URL at a supported retailer. A URL anywhere else is refused with error code "unsupported_merchant".',
+		placeholder: 'https://www.johnlewis.com/example/p123456',
+		description: 'Product page URL at any public retailer website. This is the strongest input, because the page is read directly and the search stage is skipped.',
 		displayOptions: {
 			show: { resource: ['product'], operation: ['resolve'], resolveBy: ['url'] },
 		},
@@ -321,7 +321,9 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 				name: 'market',
 				type: 'string',
 				default: 'AU',
-				description: 'Two letter country code. Only AU returns data today; other markets return an empty result.',
+				placeholder: 'AU',
+				description:
+					'Country whose retailers Nesika searches, as a two letter ISO 3166-1 code, for example "AU", "GB", "US", "DE" or "JP". Any country code works. Write "UK" and the node sends "GB", because "UK" is not a country code and the API refuses it.',
 			},
 			{
 				displayName: 'Maximum Price',
@@ -347,10 +349,12 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 			{
 				displayName: 'Retailers',
 				name: 'merchantIds',
-				type: 'multiOptions',
-				options: MERCHANT_OPTIONS,
+				type: 'string',
+				typeOptions: { multipleValues: true, multipleValueButtonText: 'Add Retailer' },
 				default: [],
-				description: 'Restrict the work to these retailers. Search ignores this and reports it in the response evidence, because market wide discovery cannot filter by retailer.',
+				placeholder: 'kogan.com',
+				description:
+					`Check these retailers only, up to eight. Each value is a retailer website such as "kogan.com", or a name the API knows: ${NAMED_RETAILERS}. Leave it empty to let one web search pick the retailers. Search ignores this field and says so in the response evidence, because market wide discovery cannot filter by retailer.`,
 			},
 		],
 	},
@@ -367,15 +371,18 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 				name: 'market',
 				type: 'string',
 				default: 'AU',
-				description: 'Two letter country code. Only AU returns data today.',
+				placeholder: 'AU',
+				description:
+					'Country whose retailers Nesika searches, as a two letter ISO 3166-1 code, for example "AU", "GB" or "US". Write "UK" and the node sends "GB".',
 			},
 			{
 				displayName: 'Retailer',
 				name: 'merchantId',
-				type: 'options',
-				options: MERCHANT_OPTIONS,
-				default: 'BigW',
-				description: 'Resolve inside one retailer only',
+				type: 'string',
+				default: '',
+				placeholder: 'kogan.com',
+				description:
+					`Resolve inside one retailer only. Use a retailer website such as "kogan.com", or a name the API knows: ${NAMED_RETAILERS}. When you also give a Product URL, that URL must be on this retailer.`,
 			},
 			{
 				displayName: 'Additional Identifiers',
@@ -439,7 +446,8 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 540 },
 				default: 540,
-				description: 'Wall clock budget for the whole operation',
+				description:
+					'Wall clock budget for the whole operation. The node runs every call as a job, so the whole budget is usable.',
 			},
 			{
 				displayName: 'Max Candidates',
@@ -479,7 +487,8 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 8 },
 				default: 6,
-				description: 'Retailers to search. Three AU retailers are supported today, so the real fan out stops there.',
+				description:
+					'Retailers to search. Without the Retailers option, this many retailer websites are taken from one web search, most relevant first.',
 			},
 		],
 	},

@@ -53,18 +53,71 @@ async function request(
 	};
 }
 
+interface ReadError {
+	code?: string;
+	message?: string;
+	fields: string[];
+}
+
+/**
+ * Reads whichever error shape came back.
+ *
+ * The Commerce routes answer with a flat body: `error_code`, `message` and `invalid_fields`.
+ * The metering layer in front of them, which handles payment and rate limits, answers with the
+ * older nested shape: `error.errorCode` and `error.message`. A finished job carries the flat
+ * Commerce error under `error`.
+ */
+function readError(body: IDataObject): ReadError {
+	const nested = body.error as IDataObject | undefined;
+	const source = nested && typeof nested === 'object' ? nested : body;
+	const code = (source.error_code ?? source.errorCode) as string | undefined;
+	const fields = Array.isArray(source.invalid_fields) ? (source.invalid_fields as string[]) : [];
+	return { code, message: source.message as string | undefined, fields };
+}
+
+/** Says what a caller can do about each answer, in the same terms as the Zapier integration. */
+function explainStatus(statusCode: number, code?: string): string | undefined {
+	if (statusCode === 401) {
+		return 'Nesika did not accept the API key. Open the credential and paste a current key from the Nesika console.';
+	}
+	if (statusCode === 402) {
+		return 'The account has no data points left, so nothing ran and nothing was charged. Add data points in the Nesika console, then run the workflow again.';
+	}
+	if (statusCode === 403) {
+		return code === 'insufficient_scope'
+			? 'This key cannot use Commerce. Create a Developer Project key with Commerce access.'
+			: undefined;
+	}
+	if (statusCode === 429) {
+		return code === 'quota_exceeded'
+			? 'The account has reached its monthly request limit. Check usage in the Nesika console.'
+			: 'Nesika is receiving too many requests from this account. Wait, then run the workflow again.';
+	}
+	if (statusCode === 404 || statusCode === 410) {
+		return 'Nesika no longer holds this job, because a job and its result are kept for 24 hours. Run the workflow again to repeat the call.';
+	}
+	if (statusCode >= 500) {
+		return 'Nesika is temporarily unavailable. Nothing was charged. Run the workflow again in a few minutes.';
+	}
+	return undefined;
+}
+
 /** Turns an error body from the Commerce API into the message a workflow author reads. */
 function describeError(body: IDataObject, statusCode: number): string {
-	const envelope = (body.error as IDataObject | undefined) ?? body;
-	const code = envelope.error_code as string | undefined;
-	const message = envelope.message as string | undefined;
-	const fields = envelope.invalid_fields as string[] | undefined;
+	const { code, message, fields } = readError(body);
 	const parts = [message ?? `The Nesika Commerce API answered ${statusCode}.`];
 	if (code) {
 		parts.push(`Error code: ${code}.`);
 	}
-	if (fields?.length) {
+	if (fields.length > 0) {
 		parts.push(`Fields: ${fields.join(', ')}.`);
+	}
+	const advice = explainStatus(statusCode, code);
+	if (advice) {
+		parts.push(advice);
+	}
+	if (body.status === 'failed' && body.units_charged === 0) {
+		parts.push('The job failed, so no data points were charged.');
 	}
 	return parts.join(' ');
 }

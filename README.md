@@ -82,14 +82,16 @@ text is keyword matched, not read by a language model, so phrase it plainly. Rec
 focuses are price, availability, retailers, identity and shipping. Anything else falls back
 to a general search.
 
-Deep Search covers the same retailers as Find Offers for twice the price, so reach for it
+Deep Search reaches the same retailers as Find Offers for twice the price, so reach for it
 only when Find Offers has left a real gap.
 
 ## How long a call takes
 
 Commerce calls are slow by the standards of most APIs, because each one reads retailer pages
-while you wait. Search takes roughly 25 to 40 seconds. Find Offers takes anywhere from 15
-seconds to about 2 minutes. Deep Search can take 4 minutes.
+while you wait. Most calls take from about half a minute to a few minutes. Naming retailers
+under **Retailers** makes a call slower, because each named retailer is searched in turn:
+Find Offers runs at roughly one minute with no retailer named and closer to three minutes with
+several named.
 
 The node handles this for you. It submits the call as a job, waits, and returns the finished
 result as one output item. n8n has no per-node time limit by default, so a long call is fine.
@@ -125,10 +127,19 @@ schedule.
 
 ## Coverage
 
-Today Commerce returns data for Australia only. Other markets return an empty result rather
-than an error. Three retailers are supported: Big W, Kmart and Bunnings Warehouse.
+**Markets.** Set **Market** to any two-letter ISO 3166-1 country code, such as `AU`, `GB`,
+`US`, `DE` or `JP`. The default is `AU`. A code that is not a country, such as `EU`, is
+refused with the error code `unsupported_market`. `UK` is not a country code either, so the
+node sends `GB` when you write `UK`.
 
-Search cannot filter by retailer, because discovery runs across the market. When you set
+**Retailers.** Leave **Retailers** empty and one web search picks the retailers for you,
+across the open web. Fill it in to check named retailers only, up to eight. Each entry is
+either a retailer website, such as `kogan.com` or `johnlewis.com`, or one of the names the API
+knows: `BigW`, `Kmart`, `BunningsWarehouse`, `Coles`, `Woolworths`, `ChemistWarehouse` and
+`TheRejectShop`. A name the API does not know comes back as `unsupported_merchant`, so use the
+website instead.
+
+Search cannot filter by retailer, because discovery runs across the whole market. When you set
 **Retailers** on a Search, the response reports that the filter was not applied instead of
 quietly dropping results.
 

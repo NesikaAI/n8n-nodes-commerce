@@ -53,14 +53,39 @@ function splitTerms(value: string): string[] {
 		.filter((term) => term.length > 0);
 }
 
+/**
+ * Normalises a market code. The API takes any ISO 3166-1 alpha-2 country code and refuses
+ * anything that is not a country, so "UK" becomes "GB" rather than an error the user has to
+ * work out for themselves.
+ */
+function normaliseMarket(value: unknown): string | undefined {
+	if (typeof value !== 'string' || value.trim() === '') {
+		return undefined;
+	}
+	const code = value.trim().toUpperCase();
+	return code === 'UK' ? 'GB' : code;
+}
+
+/** Drops blank entries a user left behind in a repeated field. */
+function cleanList(value: unknown): string[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	return value
+		.map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+		.filter((entry) => entry.length > 0);
+}
+
 /** Builds the market, retailer, category and price fields the wide operations share. */
 function buildSharedFields(options: IDataObject): IDataObject {
 	const fields: IDataObject = {};
-	if (options.market) {
-		fields.market = options.market;
+	const market = normaliseMarket(options.market);
+	if (market) {
+		fields.market = market;
 	}
-	if (Array.isArray(options.merchantIds) && options.merchantIds.length > 0) {
-		fields.merchant_ids = options.merchantIds;
+	const retailers = cleanList(options.merchantIds);
+	if (retailers.length > 0) {
+		fields.merchant_ids = retailers;
 	}
 	if (typeof options.categoryTerms === 'string' && options.categoryTerms.trim() !== '') {
 		fields.category_terms = splitTerms(options.categoryTerms);
@@ -123,11 +148,13 @@ function buildBody(context: IExecuteFunctions, itemIndex: number, operation: str
 		const identifiers = withoutEmptyValues((options.identifiers as IDataObject) ?? {});
 		Object.assign(body, identifiers);
 
-		if (options.market) {
-			body.market = options.market;
+		const market = normaliseMarket(options.market);
+		if (market) {
+			body.market = market;
 		}
-		if (options.merchantId) {
-			body.merchant_id = options.merchantId;
+		const retailer = typeof options.merchantId === 'string' ? options.merchantId.trim() : '';
+		if (retailer !== '') {
+			body.merchant_id = retailer;
 		}
 
 		const resolveBy = context.getNodeParameter('resolveBy', itemIndex) as string;

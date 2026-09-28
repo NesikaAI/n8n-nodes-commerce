@@ -131,7 +131,7 @@ describe('building request bodies', () => {
 				query: 'air fryer',
 				options: {
 					market: 'AU',
-					merchantIds: ['BigW', 'Kmart'],
+					merchantIds: ['BigW', 'kogan.com'],
 					categoryTerms: 'kitchen, appliances',
 					priceMinimum: 50,
 					priceMaximum: 200,
@@ -145,7 +145,7 @@ describe('building request bodies', () => {
 		expect(requests[0].body).toEqual({
 			query: 'air fryer',
 			market: 'AU',
-			merchant_ids: ['BigW', 'Kmart'],
+			merchant_ids: ['BigW', 'kogan.com'],
 			category_terms: ['kitchen', 'appliances'],
 			price: { minimum: 50, maximum: 200, currency: 'AUD' },
 			budget: { max_results: 5, deadline_seconds: 120 },
@@ -160,8 +160,8 @@ describe('building request bodies', () => {
 				resolveBy: 'url',
 				url: 'https://www.bigw.com.au/product/example/p/123',
 				resolveOptions: {
-					market: 'AU',
-					merchantId: 'BigW',
+					market: 'GB',
+					merchantId: 'johnlewis.com',
 					identifiers: { gtin: '09300675024235', model: 'WH-1000XM5', sku: '' },
 				},
 			},
@@ -171,8 +171,8 @@ describe('building request bodies', () => {
 		expect(requests[0].url).toBe('https://api.nesika.ai/api/v1/commerce/resolve-product');
 		expect(requests[0].body).toEqual({
 			url: 'https://www.bigw.com.au/product/example/p/123',
-			market: 'AU',
-			merchant_id: 'BigW',
+			market: 'GB',
+			merchant_id: 'johnlewis.com',
 			gtin: '09300675024235',
 			model: 'WH-1000XM5',
 		});
@@ -195,6 +195,37 @@ describe('building request bodies', () => {
 				gtin: '09300675024235',
 				brand: 'Sony',
 			},
+		});
+	});
+
+	it('sends any country code, and turns UK into GB', async () => {
+		const { requests } = await run({
+			parameters: {
+				resource: 'product',
+				operation: 'search',
+				query: 'air fryer',
+				options: { market: ' uk ' },
+			},
+			responses: [{ statusCode: 200, body: { candidates: [] } }],
+		});
+
+		expect(requests[0].body).toEqual({ query: 'air fryer', market: 'GB' });
+	});
+
+	it('drops blank retailers a user left behind', async () => {
+		const { requests } = await run({
+			parameters: {
+				resource: 'product',
+				operation: 'search',
+				query: 'air fryer',
+				options: { merchantIds: ['  ', 'johnlewis.com', ''] },
+			},
+			responses: [{ statusCode: 200, body: { candidates: [] } }],
+		});
+
+		expect(requests[0].body).toEqual({
+			query: 'air fryer',
+			merchant_ids: ['johnlewis.com'],
 		});
 	});
 
@@ -244,6 +275,32 @@ describe('errors', () => {
 		).rejects.toThrow(/unsupported_merchant/);
 	});
 
+	it('explains an out-of-credit answer from the metering layer', async () => {
+		await expect(
+			run({
+				parameters: { resource: 'product', operation: 'search', query: 'air fryer' },
+				responses: [
+					{
+						statusCode: 402,
+						body: { error: { errorCode: 'quota_exhausted', message: 'No data points remain.' } },
+					},
+				],
+			}),
+		).rejects.toThrow(/no data points left/i);
+	});
+
+	it('explains an expired job', async () => {
+		await expect(
+			run({
+				parameters: { resource: 'product', operation: 'search', query: 'air fryer' },
+				responses: [
+					{ statusCode: 202, body: pendingJob() },
+					{ statusCode: 410, body: { success: false, error_code: 'job_expired', message: 'Gone.' } },
+				],
+			}),
+		).rejects.toThrow(/kept for 24 hours/);
+	});
+
 	it('reports a failed job with the error the job carries', async () => {
 		await expect(
 			run({
@@ -256,7 +313,7 @@ describe('errors', () => {
 					},
 				],
 			}),
-		).rejects.toThrow(/That retailer is not supported/);
+		).rejects.toThrow(/no data points were charged/);
 	});
 
 	it('stops waiting once the timeout passes and names the job', async () => {
