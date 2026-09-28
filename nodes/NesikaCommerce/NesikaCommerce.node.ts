@@ -256,7 +256,7 @@ export class NesikaCommerce implements INodeType {
 				const waitForCompletion = (jobOptions.waitForCompletion as boolean | undefined) ?? true;
 				const userKey = ((jobOptions.idempotencyKey as string | undefined) ?? '').trim();
 
-				const { response } = await runOperation(this, {
+				const { response, job, usage } = await runOperation(this, {
 					baseUrl,
 					path: endpoint.path,
 					body: buildBody(this, itemIndex, operation),
@@ -267,18 +267,29 @@ export class NesikaCommerce implements INodeType {
 				});
 
 				const outputMode = (jobOptions.output as string | undefined) ?? 'results';
+				// What the call cost belongs with the whole response, not repeated on every result.
+				const nesika: IDataObject = { ...usage };
+				if (job?.job_id) {
+					nesika.jobId = job.job_id;
+					if (typeof job.units_charged === 'number') {
+						nesika.dataPointsCharged = job.units_charged;
+					}
+				}
 				const results = endpoint.resultsField
 					? (response[endpoint.resultsField] as IDataObject[] | undefined)
 					: undefined;
 
 				if (!waitForCompletion || outputMode === 'response' || results === undefined) {
-					output.push({ json: response, pairedItem: { item: itemIndex } });
+					output.push({
+						json: { ...response, nesika },
+						pairedItem: { item: itemIndex },
+					});
 					continue;
 				}
 
 				if (results.length === 0) {
 					output.push({
-						json: { ...response, [endpoint.resultsField as string]: [] },
+						json: { ...response, [endpoint.resultsField as string]: [], nesika },
 						pairedItem: { item: itemIndex },
 					});
 					continue;

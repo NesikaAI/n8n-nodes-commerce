@@ -11,6 +11,7 @@ export interface RecordedRequest {
 export interface StubbedResponse {
 	statusCode: number;
 	body: IDataObject;
+	headers?: IDataObject;
 }
 
 export interface ContextOptions {
@@ -44,7 +45,7 @@ export function createExecuteContext(options: ContextOptions): TestContext {
 			if (!next) {
 				throw new Error(`No stubbed response left for ${requestOptions.url}`);
 			}
-			return { statusCode: next.statusCode, body: next.body };
+			return { statusCode: next.statusCode, body: next.body, headers: next.headers ?? {} };
 		},
 	);
 

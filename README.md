@@ -121,6 +121,11 @@ Nesika bills data points, at a fixed rate per operation:
 A failed call and a repeated call with the same idempotency key are both free. The **Work
 Budget** settings bound how much work a call does, but they never change the price.
 
+Set **Output** under **Job Handling** to "Whole Response" and the item carries a `nesika`
+object holding what the call cost and what the account has left: `dataPointsCharged`,
+`dataPointsUsedThisPeriod`, `dataPointsRemaining` and the `jobId`. Use it to watch spend from
+inside a workflow.
+
 New accounts receive 1,000 free data points once. That grant does not renew, so a workflow
 that runs every hour will use it up. Check your plan before you put a Nesika node on a short
 schedule.

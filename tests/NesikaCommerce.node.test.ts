@@ -93,7 +93,7 @@ describe('waiting for a job', () => {
 		});
 
 		expect(items).toHaveLength(1);
-		expect(items[0].json).toEqual(response);
+		expect(items[0].json).toEqual({ ...response, nesika: {} });
 	});
 
 	it('returns the job straight away when Wait for Result is off', async () => {
@@ -111,6 +111,36 @@ describe('waiting for a job', () => {
 		expect(items[0].json).toMatchObject({ job_id: 'job-1', status: 'pending' });
 	});
 
+	it('reports what the call cost, from the usage headers and the job', async () => {
+		const { items } = await run({
+			parameters: {
+				resource: 'product',
+				operation: 'search',
+				query: 'air fryer',
+				jobOptions: { output: 'response' },
+			},
+			responses: [
+				{
+					statusCode: 202,
+					body: pendingJob(),
+					headers: {
+						'x-usage-datapoints-consumed': '5',
+						'x-nesika-usage-used': '120',
+						'x-nesika-usage-remaining': '880',
+					},
+				},
+				{ statusCode: 200, body: succeededJob({ candidates: [] }) },
+			],
+		});
+
+		expect(items[0].json.nesika).toEqual({
+			dataPointsCharged: 5,
+			dataPointsUsedThisPeriod: 120,
+			dataPointsRemaining: 880,
+			jobId: 'job-1',
+		});
+	});
+
 	it('keeps an empty result list as one item', async () => {
 		const { items } = await run({
 			parameters: { resource: 'product', operation: 'search', query: 'air fryer' },
@@ -118,7 +148,7 @@ describe('waiting for a job', () => {
 		});
 
 		expect(items).toHaveLength(1);
-		expect(items[0].json).toEqual({ candidates: [], status: 'no_match' });
+		expect(items[0].json).toEqual({ candidates: [], status: 'no_match', nesika: {} });
 	});
 });
 

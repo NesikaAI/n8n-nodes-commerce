@@ -12,6 +12,14 @@ const DEFAULT_POLL_MS = 5000;
 export interface CommerceResponse {
 	statusCode: number;
 	body: IDataObject;
+	headers: IDataObject;
+}
+
+/** What the call cost and what the account has left, as the API reports it in headers. */
+export interface CommerceUsage extends IDataObject {
+	dataPointsCharged?: number;
+	dataPointsUsedThisPeriod?: number;
+	dataPointsRemaining?: number;
 }
 
 /** The job envelope the API returns for an asynchronous submission. */
@@ -45,12 +53,37 @@ async function request(
 			returnFullResponse: true,
 			ignoreHttpStatusErrors: true,
 		},
-	)) as { statusCode: number; body: unknown };
+	)) as { statusCode: number; body: unknown; headers?: IDataObject };
 
 	return {
 		statusCode: response.statusCode,
 		body: (response.body ?? {}) as IDataObject,
+		headers: response.headers ?? {},
 	};
+}
+
+function readNumber(headers: IDataObject, name: string): number | undefined {
+	const value = headers[name] ?? headers[name.toLowerCase()];
+	const parsed = Number(value);
+	return typeof value === 'undefined' || Number.isNaN(parsed) ? undefined : parsed;
+}
+
+/**
+ * Reads the usage headers the API sends on every Commerce answer, so a workflow can see what
+ * a run cost without a second call.
+ */
+export function readUsage(response: CommerceResponse): CommerceUsage {
+	const usage: CommerceUsage = {
+		dataPointsCharged: readNumber(response.headers, 'x-usage-datapoints-consumed'),
+		dataPointsUsedThisPeriod: readNumber(response.headers, 'x-nesika-usage-used'),
+		dataPointsRemaining: readNumber(response.headers, 'x-nesika-usage-remaining'),
+	};
+	for (const key of Object.keys(usage)) {
+		if (usage[key] === undefined) {
+			delete usage[key];
+		}
+	}
+	return usage;
 }
 
 interface ReadError {
@@ -157,7 +190,7 @@ export async function runOperation(
 		maxWaitSeconds: number;
 		itemIndex: number;
 	},
-): Promise<{ response: IDataObject; job?: CommerceJob }> {
+): Promise<{ response: IDataObject; job?: CommerceJob; usage: CommerceUsage }> {
 	const { baseUrl, path, body, idempotencyKey, itemIndex } = parameters;
 
 	const submission = await request(context, 'POST', `${baseUrl}${path}`, {
@@ -170,7 +203,7 @@ export async function runOperation(
 
 	// The job finished inside the inline wait, so the body is already the result.
 	if (submission.statusCode === 200) {
-		return { response: submission.body };
+		return { response: submission.body, usage: readUsage(submission) };
 	}
 
 	if (submission.statusCode !== 202) {
@@ -178,11 +211,13 @@ export async function runOperation(
 	}
 
 	const job = submission.body as CommerceJob;
+	const usage = readUsage(submission);
 	if (!parameters.waitForCompletion) {
-		return { response: job, job };
+		return { response: job, job, usage };
 	}
 
-	return { response: await pollJob(context, { ...parameters, job }), job };
+	const finished = await pollJob(context, { ...parameters, job });
+	return { response: finished.result, job: finished.job, usage };
 }
 
 async function pollJob(
@@ -193,7 +228,7 @@ async function pollJob(
 		maxWaitSeconds: number;
 		itemIndex: number;
 	},
-): Promise<IDataObject> {
+): Promise<{ result: IDataObject; job: CommerceJob }> {
 	const { baseUrl, job, itemIndex } = parameters;
 	const pollUrl = `${baseUrl}/commerce/jobs/${encodeURIComponent(job.job_id)}`;
 	const giveUpAt = Date.now() + parameters.maxWaitSeconds * 1000;
@@ -225,7 +260,7 @@ async function pollJob(
 
 		const finished = poll.body as CommerceJob;
 		if (finished.status === 'succeeded' && finished.result) {
-			return finished.result;
+			return { result: finished.result, job: finished };
 		}
 
 		throw apiError(context, finished, 200, itemIndex);
