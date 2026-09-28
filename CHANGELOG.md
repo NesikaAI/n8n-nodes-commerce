@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3
+
+- README fix only. The Operations heading said four operations while five were documented,
+  because Get Job arrived in 0.1.2 and the heading was missed. The node itself is unchanged.
+
 ## 0.1.2
 
 - New **Get Job** operation. It collects a job started earlier with Wait for Result turned off,
