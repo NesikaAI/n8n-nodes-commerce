@@ -1,0 +1,62 @@
+{
+  "name": "@nesika-ai/n8n-nodes-commerce",
+  "version": "0.1.0",
+  "description": "n8n node for the Nesika Commerce API: retailer product search, product identity resolution and live price offers",
+  "license": "MIT",
+  "homepage": "https://github.com/NesikaAI/n8n-nodes-commerce",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "nesika",
+    "commerce",
+    "pricing",
+    "retail",
+    "product-search"
+  ],
+  "author": {
+    "name": "Raphael Schwalb",
+    "email": "raphael@nesikaai.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NesikaAI/n8n-nodes-commerce.git"
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "build:watch": "tsc --watch",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "release": "n8n-node release",
+    "prepublishOnly": "n8n-node prerelease",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": true,
+    "credentials": [
+      "dist/credentials/NesikaCommerceApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/NesikaCommerce/NesikaCommerce.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "*",
+    "eslint": "9.32.0",
+    "prettier": "3.6.2",
+    "release-it": "^19.0.4",
+    "typescript": "5.9.2",
+    "vitest": "^3.2.7"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "bugs": {
+    "url": "https://github.com/NesikaAI/n8n-nodes-commerce/issues"
+  }
+}
