@@ -35,3 +35,10 @@ jobs:
 
       - name: Run tests
         run: 'npm test'
+
+      # A stale TypeScript build cache once produced a package holding the icons but not the
+      # compiled node, which n8n then refused to load. This fails the build instead.
+      - name: Check the package holds the compiled node and credential
+        run: |
+          test -f dist/nodes/NesikaCommerce/NesikaCommerce.node.js
+          test -f dist/credentials/NesikaCommerceApi.credentials.js

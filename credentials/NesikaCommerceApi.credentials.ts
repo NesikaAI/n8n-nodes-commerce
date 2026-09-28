@@ -50,14 +50,39 @@ export class NesikaCommerceApi implements ICredentialType {
 		},
 	};
 
-	// Every Commerce operation costs data points, so the check reads the project identity
-	// instead. That route is free, and it answers only for a Developer Project key, which is
-	// the kind Commerce needs.
+	/**
+	 * Checks the key by reading a job id that cannot exist.
+	 *
+	 * Every Commerce operation costs data points, and reading a job costs nothing, so this is
+	 * the free way to prove a key works. A working key gets `404 job_not_found`, which is why
+	 * the check ignores the status code and reads the body instead. A key Nesika does not
+	 * accept gets `unauthorized`, and a key without Commerce access gets `insufficient_scope`.
+	 */
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL: '={{$credentials.baseUrl}}',
-			url: '/identity/developer-project',
+			url: '/commerce/jobs/n8n-credential-check',
 			method: 'GET',
+			ignoreHttpStatusErrors: true,
 		},
+		rules: [
+			{
+				type: 'responseSuccessBody',
+				properties: {
+					key: 'error_code',
+					value: 'unauthorized',
+					message: 'Nesika did not accept this API key. Check that you copied all of it.',
+				},
+			},
+			{
+				type: 'responseSuccessBody',
+				properties: {
+					key: 'error_code',
+					value: 'insufficient_scope',
+					message:
+						'This key cannot use Commerce. Create a Developer Project key with Commerce access in the Nesika console.',
+				},
+			},
+		],
 	};
 }
