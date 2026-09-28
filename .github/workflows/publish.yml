@@ -90,16 +90,34 @@ jobs:
       - name: Install dependencies
         run: 'npm ci'
 
-      - name: Release
-        # Publishes to npm with a provenance attestation (requires id-token: write above).
-        # Lint and build run automatically as part of the release process.
-        #
-        # Option A (OIDC): leave NPM_TOKEN unset — the token step is skipped and
-        #   npm uses the OIDC exchange instead.
-        # Option B (token): set NPM_TOKEN in repo secrets — it is written to
-        #   .npmrc here before publishing.
+      - name: Check the tag matches the version in package.json
         run: |
-          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          npm run release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          tag="${GITHUB_REF_NAME}"
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag $tag does not match package.json version $version." >&2
+            exit 1
+          fi
+
+      - name: Run lint
+        run: 'npm run lint'
+
+      - name: Run build
+        run: 'npm run build'
+
+      - name: Run tests
+        run: 'npm test'
+
+      # A stale build once produced a package holding the icons but not the compiled node,
+      # which n8n then refused to load. Publishing that would be worse than failing here.
+      - name: Check the package holds the compiled node and credential
+        run: |
+          test -f dist/nodes/NesikaCommerce/NesikaCommerce.node.js
+          test -f dist/credentials/NesikaCommerceApi.credentials.js
+
+      - name: Publish to npm with provenance
+        # --ignore-scripts skips the scaffold's prepublishOnly guard, which exists to stop a
+        # hand-typed publish. Everything that guard protects has already run above.
+        # Authentication comes from the trusted publisher configured on npmjs.com, which uses
+        # the OIDC token minted by `id-token: write`. No secret is stored in this repository.
+        run: 'npm publish --provenance --access public --ignore-scripts'

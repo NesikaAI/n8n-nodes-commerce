@@ -33,19 +33,30 @@ configured for a package that already exists, so the first version goes up by ha
 3. **Turn on "Require two-factor authentication and disallow tokens"** in the same settings, so
    nothing can publish except this workflow.
 
-4. **Leave `NPM_TOKEN` unset** in the repository secrets. The workflow falls back to a token only
-   if one exists, and trusted publishing is the safer path.
+4. **Leave `NPM_TOKEN` unset** in the repository secrets. The workflow authenticates only
+   through the trusted publisher, so no secret sits in this repository.
+
+Note on the account's own two-factor setting. With "authorization and writes", npm asks for a
+one-time code on every publish from a machine, and a security key cannot answer that prompt.
+That is why 0.1.0 went up through the npm website. Once the trusted publisher exists, the
+workflow publishes without any code at all.
 
 ## Every release after that
 
-```sh
-npm run release
-```
+1. Raise `version` in `package.json` and add the entry to `CHANGELOG.md`.
+2. Commit, then tag the commit with the bare version and push both:
 
-That command lints, builds, asks for the version, updates the changelog, commits, tags and
-pushes. The tag push runs `.github/workflows/publish.yml`, which publishes with provenance.
+   ```sh
+   git commit -am "chore: release 0.1.1"
+   git tag 0.1.1
+   git push origin main --tags
+   ```
 
-Check afterwards that the npm page shows the provenance badge, and that the version installs:
+The tag push runs `.github/workflows/publish.yml`. It checks the tag matches the version,
+lints, builds, tests, checks the compiled files are in place, and publishes with provenance.
+Publishing by hand is not the path: only the workflow can produce provenance.
+
+Check afterwards that the npm page shows the provenance badge, and that the scanner passes:
 
 ```sh
 npx @n8n/scan-community-package @nesika-ai/n8n-nodes-commerce
