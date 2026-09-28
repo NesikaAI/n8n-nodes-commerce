@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Published from GitHub Actions with a provenance statement, which n8n requires for a verified
+  node. 0.1.0 was published by hand to create the package, so it carries none.
+- No change to what the node does.
+
 ## 0.1.0
 
 First release.
