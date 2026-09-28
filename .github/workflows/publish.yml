@@ -78,8 +78,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          # npm trusted publishing needs Node 22.14 or later and npm 11.5.1 or later.
+          node-version: '24'
           cache: 'npm'
+
+      - name: Use an npm that can publish with trusted publishing
+        run: |
+          npm install --global npm@latest
+          npm --version
 
       - name: Install dependencies
         run: 'npm ci'
