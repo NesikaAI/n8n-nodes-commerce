@@ -53,8 +53,20 @@ workflow publishes without any code at all.
    ```
 
 The tag push runs `.github/workflows/publish.yml`. It checks the tag matches the version,
-lints, builds, tests, checks the compiled files are in place, and publishes with provenance.
-Publishing by hand is not the path: only the workflow can produce provenance.
+lints, builds, tests, checks the compiled files are in place, and stages the release with
+provenance. Publishing by hand is not the path: only the workflow can produce provenance.
+
+3. **Approve the staged version.** The package's trusted publisher may stage a release but not
+   publish one, so nobody can install the version until a maintainer approves it:
+
+   ```sh
+   npm stage ls @nesika-ai/n8n-nodes-commerce
+   npm stage approve <stage-id>
+   ```
+
+   Approving asks for two-factor confirmation, which is the point of staging: the machine
+   builds and uploads, a person decides it goes live. It can also be done on the package page
+   on npmjs.com.
 
 Check afterwards that the npm page shows the provenance badge, and that the scanner passes:
 

@@ -115,9 +115,20 @@ jobs:
           test -f dist/nodes/NesikaCommerce/NesikaCommerce.node.js
           test -f dist/credentials/NesikaCommerceApi.credentials.js
 
-      - name: Publish to npm with provenance
+      - name: Stage the release on npm with provenance
+        # `npm stage publish` uploads the version and waits for a human to approve it, which is
+        # what the package's trusted publisher allows. A direct `npm publish` is refused with
+        # "OIDC permission denied for this action" unless direct publishing is turned on.
+        #
         # --ignore-scripts skips the scaffold's prepublishOnly guard, which exists to stop a
         # hand-typed publish. Everything that guard protects has already run above.
-        # Authentication comes from the trusted publisher configured on npmjs.com, which uses
-        # the OIDC token minted by `id-token: write`. No secret is stored in this repository.
-        run: 'npm publish --provenance --access public --ignore-scripts'
+        # Authentication comes from the trusted publisher on npmjs.com, through the OIDC token
+        # minted by `id-token: write`. No secret is stored in this repository.
+        run: 'npm stage publish --provenance --access public --ignore-scripts'
+
+      - name: Say what to do next
+        run: |
+          echo "Staged ${GITHUB_REF_NAME}. Approve it to make it installable:"
+          echo "  npm stage ls @nesika-ai/n8n-nodes-commerce"
+          echo "  npm stage approve <stage-id>   # asks for two-factor approval"
+
