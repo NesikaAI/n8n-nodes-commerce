@@ -85,6 +85,15 @@ to a general search.
 Deep Search reaches the same retailers as Find Offers for twice the price, so reach for it
 only when Find Offers has left a real gap.
 
+### Get Job
+
+Collects a job you started earlier with **Wait for Result** turned off. It costs nothing.
+
+Give it the `job_id` the earlier call returned. A finished job comes back shaped exactly like
+the operation that started it, so a collected Search splits into one item per product. A job
+that is still running comes back as it stands, so a workflow can wait and ask again. Nesika
+keeps a job and its result for 24 hours.
+
 ## How long a call takes
 
 Commerce calls are slow by the standards of most APIs, because each one reads retailer pages
@@ -100,8 +109,8 @@ Two settings under **Job Handling** change that behaviour:
 
 - **Timeout (Seconds)** is how long the node keeps waiting. The default is 900, which is the
   point at which Nesika abandons a job and returns your data points.
-- **Wait for Result**, when turned off, returns the job envelope straight away. Use this when
-  you would rather poll `GET /commerce/jobs/{job_id}` from a later step or another workflow.
+- **Wait for Result**, when turned off, returns the job envelope straight away. Collect it later
+  with the **Get Job** operation, which is free, or from another workflow.
 
 The node sends an idempotency key built from the execution id, the node name and the item
 index. An n8n retry therefore replays the first call and costs nothing extra. Set your own

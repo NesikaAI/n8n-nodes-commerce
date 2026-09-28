@@ -8,7 +8,14 @@ import type {
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import { nesikaCommerceProperties } from './properties';
-import { CREDENTIAL_NAME, runOperation, trimBaseUrl } from './transport';
+import {
+	apiError,
+	CREDENTIAL_NAME,
+	getJob,
+	runOperation,
+	trimBaseUrl,
+	type CommerceJob,
+} from './transport';
 
 /** Where each operation posts, and which response field holds its list of results. */
 const OPERATIONS: Record<string, { path: string; resultsField?: string }> = {
@@ -16,6 +23,16 @@ const OPERATIONS: Record<string, { path: string; resultsField?: string }> = {
 	resolve: { path: '/commerce/resolve-product' },
 	findOffers: { path: '/commerce/find-offers', resultsField: 'offers' },
 	deepSearch: { path: '/commerce/deep-search', resultsField: 'results' },
+};
+
+/**
+ * The same list fields, keyed by the operation name a job reports. Get Job has no node
+ * parameter saying which operation ran, so the job itself says it.
+ */
+const RESULT_FIELD_BY_JOB_OPERATION: Record<string, string> = {
+	search_products: 'candidates',
+	find_offers: 'offers',
+	deep_search: 'results',
 };
 
 const IDENTITY_FIELDS = [
@@ -214,6 +231,53 @@ function buildIdempotencyKey(context: IExecuteFunctions, itemIndex: number): str
 	return safe.slice(0, 128);
 }
 
+/**
+ * Turns one finished response into n8n items: one per result by default, or the whole
+ * response when the user asked for that, or when the operation returns no list.
+ */
+function pushItems(
+	output: INodeExecutionData[],
+	parameters: {
+		response: IDataObject;
+		resultsField?: string;
+		splitResults: boolean;
+		nesika: IDataObject;
+		itemIndex: number;
+	},
+): void {
+	const { response, resultsField, splitResults, nesika, itemIndex } = parameters;
+	const results = resultsField ? (response[resultsField] as IDataObject[] | undefined) : undefined;
+
+	if (!splitResults || results === undefined) {
+		output.push({ json: { ...response, nesika }, pairedItem: { item: itemIndex } });
+		return;
+	}
+
+	if (results.length === 0) {
+		output.push({
+			json: { ...response, [resultsField as string]: [], nesika },
+			pairedItem: { item: itemIndex },
+		});
+		return;
+	}
+
+	for (const result of results) {
+		output.push({ json: result, pairedItem: { item: itemIndex } });
+	}
+}
+
+/** Collects what a call cost, from the usage headers and from the job when there is one. */
+function describeUsage(usage: IDataObject, job?: CommerceJob): IDataObject {
+	const nesika: IDataObject = { ...usage };
+	if (job?.job_id) {
+		nesika.jobId = job.job_id;
+		if (typeof job.units_charged === 'number') {
+			nesika.dataPointsCharged = job.units_charged;
+		}
+	}
+	return nesika;
+}
+
 export class NesikaCommerce implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Nesika Commerce',
@@ -245,6 +309,40 @@ export class NesikaCommerce implements INodeType {
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
 				const operation = this.getNodeParameter('operation', itemIndex) as string;
+				const jobOptions = this.getNodeParameter('jobOptions', itemIndex, {}) as IDataObject;
+				const outputMode = (jobOptions.output as string | undefined) ?? 'results';
+
+				if (operation === 'getJob') {
+					const jobId = (this.getNodeParameter('jobId', itemIndex) as string).trim();
+					if (jobId === '') {
+						throw new NodeOperationError(this.getNode(), 'Job ID is empty.', { itemIndex });
+					}
+
+					const collected = await getJob(this, { baseUrl, jobId, itemIndex });
+					const nesika = describeUsage(collected.usage, collected.job);
+
+					// A finished job carries the body the operation would have returned, so it is
+					// shaped the same way. A failed one is an error, exactly as when the node waits.
+					if (collected.job.status === 'succeeded' && collected.job.result) {
+						pushItems(output, {
+							response: collected.job.result,
+							resultsField: RESULT_FIELD_BY_JOB_OPERATION[collected.job.operation as string],
+							splitResults: outputMode !== 'response',
+							nesika,
+							itemIndex,
+						});
+						continue;
+					}
+
+					if (collected.job.status === 'failed') {
+						throw apiError(this, collected.job, 200, itemIndex);
+					}
+
+					// Still running. The job comes back as it stands, so a workflow can wait and ask again.
+					output.push({ json: { ...collected.job, nesika }, pairedItem: { item: itemIndex } });
+					continue;
+				}
+
 				const endpoint = OPERATIONS[operation];
 				if (!endpoint) {
 					throw new NodeOperationError(this.getNode(), `Unknown operation "${operation}".`, {
@@ -252,7 +350,6 @@ export class NesikaCommerce implements INodeType {
 					});
 				}
 
-				const jobOptions = this.getNodeParameter('jobOptions', itemIndex, {}) as IDataObject;
 				const waitForCompletion = (jobOptions.waitForCompletion as boolean | undefined) ?? true;
 				const userKey = ((jobOptions.idempotencyKey as string | undefined) ?? '').trim();
 
@@ -266,38 +363,13 @@ export class NesikaCommerce implements INodeType {
 					itemIndex,
 				});
 
-				const outputMode = (jobOptions.output as string | undefined) ?? 'results';
-				// What the call cost belongs with the whole response, not repeated on every result.
-				const nesika: IDataObject = { ...usage };
-				if (job?.job_id) {
-					nesika.jobId = job.job_id;
-					if (typeof job.units_charged === 'number') {
-						nesika.dataPointsCharged = job.units_charged;
-					}
-				}
-				const results = endpoint.resultsField
-					? (response[endpoint.resultsField] as IDataObject[] | undefined)
-					: undefined;
-
-				if (!waitForCompletion || outputMode === 'response' || results === undefined) {
-					output.push({
-						json: { ...response, nesika },
-						pairedItem: { item: itemIndex },
-					});
-					continue;
-				}
-
-				if (results.length === 0) {
-					output.push({
-						json: { ...response, [endpoint.resultsField as string]: [], nesika },
-						pairedItem: { item: itemIndex },
-					});
-					continue;
-				}
-
-				for (const result of results) {
-					output.push({ json: result, pairedItem: { item: itemIndex } });
-				}
+				pushItems(output, {
+					response,
+					resultsField: endpoint.resultsField,
+					splitResults: waitForCompletion && outputMode !== 'response',
+					nesika: describeUsage(usage, job),
+					itemIndex,
+				});
 			} catch (error) {
 				if (this.continueOnFail()) {
 					output.push({

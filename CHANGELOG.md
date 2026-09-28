@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+- New **Get Job** operation. It collects a job started earlier with Wait for Result turned off,
+  and it costs nothing. A finished job is shaped exactly like the operation that started it, and
+  one still running comes back as it stands.
+- The operation list is now in alphabetical order, which is n8n's convention.
+
 ## 0.1.1
 
 - Published from GitHub Actions with a provenance statement, which n8n requires for a verified

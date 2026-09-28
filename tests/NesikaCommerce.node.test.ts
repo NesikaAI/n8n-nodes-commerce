@@ -371,3 +371,78 @@ describe('errors', () => {
 		expect(items[0].json.error).toContain('That retailer is not supported.');
 	});
 });
+
+describe('collecting a job later', () => {
+	it('reads the job and splits a finished search into items', async () => {
+		const { items, requests } = await run({
+			parameters: { resource: 'product', operation: 'getJob', jobId: 'job_abc' },
+			responses: [
+				{
+					statusCode: 200,
+					body: {
+						job_id: 'job_abc',
+						status: 'succeeded',
+						operation: 'search_products',
+						units_charged: 5,
+						result: { candidates: [{ merchant_id: 'BigW' }, { merchant_id: 'Kmart' }] },
+					},
+				},
+			],
+		});
+
+		expect(requests).toHaveLength(1);
+		expect(requests[0].method).toBe('GET');
+		expect(requests[0].url).toBe('https://api.nesika.ai/api/v1/commerce/jobs/job_abc');
+		expect(items).toHaveLength(2);
+		expect(items[0].json).toEqual({ merchant_id: 'BigW' });
+	});
+
+	it('returns a job that is still running, so a workflow can ask again', async () => {
+		const { items } = await run({
+			parameters: { resource: 'product', operation: 'getJob', jobId: 'job_abc' },
+			responses: [{ statusCode: 202, body: pendingJob() }],
+		});
+
+		expect(items).toHaveLength(1);
+		expect(items[0].json).toMatchObject({ job_id: 'job-1', status: 'pending' });
+	});
+
+	it('raises a failed job as an error', async () => {
+		await expect(
+			run({
+				parameters: { resource: 'product', operation: 'getJob', jobId: 'job_abc' },
+				responses: [
+					{
+						statusCode: 200,
+						body: {
+							job_id: 'job_abc',
+							status: 'failed',
+							units_charged: 0,
+							error: { error_code: 'job_timed_out', message: 'Nesika ran out of time.' },
+						},
+					},
+				],
+			}),
+		).rejects.toThrow(/no data points were charged/);
+	});
+
+	it('explains a job that is gone', async () => {
+		await expect(
+			run({
+				parameters: { resource: 'product', operation: 'getJob', jobId: 'job_abc' },
+				responses: [
+					{ statusCode: 410, body: { success: false, error_code: 'job_expired', message: 'Gone.' } },
+				],
+			}),
+		).rejects.toThrow(/kept for 24 hours/);
+	});
+
+	it('refuses an empty job id before calling the API', async () => {
+		await expect(
+			run({
+				parameters: { resource: 'product', operation: 'getJob', jobId: '   ' },
+				responses: [],
+			}),
+		).rejects.toThrow('Job ID is empty.');
+	});
+});

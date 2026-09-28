@@ -173,6 +173,28 @@ export function apiError(
 }
 
 /**
+ * Reads one job by its id. Reading is free, so a workflow can collect a job it started
+ * earlier without paying again. A job that is still running comes back as it stands.
+ */
+export async function getJob(
+	context: IExecuteFunctions,
+	parameters: { baseUrl: string; jobId: string; itemIndex: number },
+): Promise<{ job: CommerceJob; usage: CommerceUsage }> {
+	const { baseUrl, jobId, itemIndex } = parameters;
+	const response = await request(
+		context,
+		'GET',
+		`${baseUrl}/commerce/jobs/${encodeURIComponent(jobId)}`,
+	);
+
+	if (response.statusCode !== 200 && response.statusCode !== 202) {
+		throw apiError(context, response.body, response.statusCode, itemIndex);
+	}
+
+	return { job: response.body as CommerceJob, usage: readUsage(response) };
+}
+
+/**
  * Submits one Commerce operation as a job and waits for its result.
  *
  * The API takes up to 250 seconds for some operations, which is longer than the Nesika

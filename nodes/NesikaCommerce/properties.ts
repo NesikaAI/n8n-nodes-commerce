@@ -7,6 +7,7 @@ import type { INodeProperties } from 'n8n-workflow';
 const NAMED_RETAILERS =
 	'"BigW", "Kmart", "BunningsWarehouse", "Coles", "Woolworths", "ChemistWarehouse" or "TheRejectShop"';
 
+/** The operations that submit work and cost data points. Get Job only reads, and is free. */
 const ALL_OPERATIONS = ['search', 'resolve', 'findOffers', 'deepSearch'];
 
 /** Operations that accept the shared market, retailer, category and price filters. */
@@ -29,16 +30,10 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 		displayOptions: { show: { resource: ['product'] } },
 		options: [
 			{
-				name: 'Search',
-				value: 'search',
-				description: 'Find products across retailers from a shopping phrase. Costs 5 data points.',
-				action: 'Search products across retailers',
-			},
-			{
-				name: 'Resolve',
-				value: 'resolve',
-				description: 'Turn a messy product title or URL into one confirmed product identity. Costs 3 data points.',
-				action: 'Resolve a product identity',
+				name: 'Deep Search',
+				value: 'deepSearch',
+				description: 'Research one missing fact about a product across retailers. Costs 10 data points.',
+				action: 'Run a deep product search',
 			},
 			{
 				name: 'Find Offers',
@@ -47,13 +42,35 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 				action: 'Find offers for a product',
 			},
 			{
-				name: 'Deep Search',
-				value: 'deepSearch',
-				description: 'Research one missing fact about a product across retailers. Costs 10 data points.',
-				action: 'Run a deep product search',
+				name: 'Get Job',
+				value: 'getJob',
+				description: 'Collect a job started earlier with Wait for Result turned off. Costs nothing.',
+				action: 'Get a job',
+			},
+			{
+				name: 'Resolve',
+				value: 'resolve',
+				description: 'Turn a messy product title or URL into one confirmed product identity. Costs 3 data points.',
+				action: 'Resolve a product identity',
+			},
+			{
+				name: 'Search',
+				value: 'search',
+				description: 'Find products across retailers from a shopping phrase. Costs 5 data points.',
+				action: 'Search products across retailers',
 			},
 		],
 		default: 'search',
+	},
+	{
+		displayName: 'Job ID',
+		name: 'jobId',
+		type: 'string',
+		required: true,
+		default: '',
+		placeholder: 'job_...',
+		description: 'The job ID a Commerce operation returned when Wait for Result was off. Nesika keeps a job and its result for 24 hours.',
+		displayOptions: { show: { resource: ['product'], operation: ['getJob'] } },
 	},
 
 	// ---------------------------------------------------------------- Search
