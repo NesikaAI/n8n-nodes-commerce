@@ -42,7 +42,7 @@ that cannot exist, which costs nothing and proves the key works.
 
 ## Operations
 
-All four operations sit on one resource, **Product**.
+All five operations sit on one resource, **Product**.
 
 ### Search
 
