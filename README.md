@@ -141,8 +141,9 @@ schedule.
 
 ## Coverage
 
-**Markets.** Set **Market** to any two-letter ISO 3166-1 country code, such as `AU`, `GB`,
-`US`, `DE` or `JP`. The default is `AU`. A code that is not a country, such as `EU`, is
+**Markets.** **Market** is a required field on every operation, because Nesika needs one on
+every call. It takes any two-letter ISO 3166-1 country code, such as `AU`, `GB`, `US`, `DE` or
+`JP`, and defaults to `AU`. A code that is not a country, such as `EU`, is
 refused with the error code `unsupported_market`. `UK` is not a country code either, so the
 node sends `GB` when you write `UK`.
 

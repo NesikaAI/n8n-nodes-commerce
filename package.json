@@ -1,6 +1,6 @@
 {
   "name": "@nesika-ai/n8n-nodes-commerce",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "n8n node for the Nesika Commerce API: retailer product search, product identity resolution and live price offers",
   "license": "MIT",
   "homepage": "https://github.com/NesikaAI/n8n-nodes-commerce",

@@ -93,13 +93,9 @@ function cleanList(value: unknown): string[] {
 		.filter((entry) => entry.length > 0);
 }
 
-/** Builds the market, retailer, category and price fields the wide operations share. */
+/** Builds the retailer, category and price fields the wide operations share. */
 function buildSharedFields(options: IDataObject): IDataObject {
 	const fields: IDataObject = {};
-	const market = normaliseMarket(options.market);
-	if (market) {
-		fields.market = market;
-	}
 	const retailers = cleanList(options.merchantIds);
 	if (retailers.length > 0) {
 		fields.merchant_ids = retailers;
@@ -154,21 +150,31 @@ function buildIdentity(
 	return identity;
 }
 
+/**
+ * Reads the Market field and normalises it. Nesika requires a two letter country code on every
+ * request, so an empty field falls back to the documented default rather than sending nothing.
+ */
+function readMarket(context: IExecuteFunctions, itemIndex: number): string {
+	const market = normaliseMarket(context.getNodeParameter('market', itemIndex, 'AU'));
+	return market ?? 'AU';
+}
+
 function buildBody(context: IExecuteFunctions, itemIndex: number, operation: string): IDataObject {
 	const budget = withoutEmptyValues(
 		context.getNodeParameter('workBudget', itemIndex, {}) as IDataObject,
 	);
 	const body: IDataObject = {};
 
+	// Nesika marks market required on every request, so a call with none is refused with
+	// invalid_request before anything runs. The field defaults to AU and is read here rather
+	// than from the options collection, which a user never has to open.
+	body.market = readMarket(context, itemIndex);
+
 	if (operation === 'resolve') {
 		const options = context.getNodeParameter('resolveOptions', itemIndex, {}) as IDataObject;
 		const identifiers = withoutEmptyValues((options.identifiers as IDataObject) ?? {});
 		Object.assign(body, identifiers);
 
-		const market = normaliseMarket(options.market);
-		if (market) {
-			body.market = market;
-		}
 		const retailer = typeof options.merchantId === 'string' ? options.merchantId.trim() : '';
 		if (retailer !== '') {
 			body.merchant_id = retailer;

@@ -28,7 +28,7 @@ describe('submitting a call', () => {
 		expect(requests[0].method).toBe('POST');
 		expect(requests[0].url).toBe('https://api.nesika.ai/api/v1/commerce/search-products');
 		expect(requests[0].headers?.Prefer).toBe('respond-async, wait=25');
-		expect(requests[0].body).toEqual({ query: 'air fryer 5l black' });
+		expect(requests[0].body).toEqual({ query: 'air fryer 5l black', market: 'AU' });
 	});
 
 	it('sends one idempotency key per item, and repeats it on a retry', async () => {
@@ -159,8 +159,8 @@ describe('building request bodies', () => {
 				resource: 'product',
 				operation: 'search',
 				query: 'air fryer',
+				market: 'AU',
 				options: {
-					market: 'AU',
 					merchantIds: ['BigW', 'kogan.com'],
 					categoryTerms: 'kitchen, appliances',
 					priceMinimum: 50,
@@ -189,8 +189,8 @@ describe('building request bodies', () => {
 				operation: 'resolve',
 				resolveBy: 'url',
 				url: 'https://www.bigw.com.au/product/example/p/123',
+				market: 'GB',
 				resolveOptions: {
-					market: 'GB',
 					merchantId: 'johnlewis.com',
 					identifiers: { gtin: '09300675024235', model: 'WH-1000XM5', sku: '' },
 				},
@@ -220,6 +220,7 @@ describe('building request bodies', () => {
 		});
 
 		expect(requests[0].body).toEqual({
+			market: 'AU',
 			identity: {
 				canonical_name: 'Sony WH-1000XM5 Black',
 				gtin: '09300675024235',
@@ -234,7 +235,7 @@ describe('building request bodies', () => {
 				resource: 'product',
 				operation: 'search',
 				query: 'air fryer',
-				options: { market: ' uk ' },
+				market: ' uk ',
 			},
 			responses: [{ statusCode: 200, body: { candidates: [] } }],
 		});
@@ -255,6 +256,7 @@ describe('building request bodies', () => {
 
 		expect(requests[0].body).toEqual({
 			query: 'air fryer',
+			market: 'AU',
 			merchant_ids: ['johnlewis.com'],
 		});
 	});
@@ -274,8 +276,30 @@ describe('building request bodies', () => {
 		expect(requests[0].url).toBe('https://api.nesika.ai/api/v1/commerce/deep-search');
 		expect(requests[0].body).toEqual({
 			query: 'sony headphones',
+			market: 'AU',
 			reason: 'need shipping cost',
 		});
+	});
+
+	it('sends a market even when the user never touches the field', async () => {
+		// 0.1.3 only sent a market if the user opened Options and added it, and Nesika refuses
+		// any Commerce request without one. Every operation failed on invalid_request.
+		for (const operation of ['search', 'resolve', 'findOffers', 'deepSearch']) {
+			const { requests } = await run({
+				parameters: {
+					resource: 'product',
+					operation,
+					query: 'air fryer',
+					reason: 'need shipping cost',
+					deepSearchBy: 'query',
+					resolveBy: 'title',
+					title: 'philips airfryer',
+					productName: 'philips airfryer',
+				},
+				responses: [{ statusCode: 200, body: {} }],
+			});
+			expect(requests[0].body).toMatchObject({ market: 'AU' });
+		}
 	});
 
 	it('refuses a Find Offers call that names no product', async () => {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4
+
+- Fixed: every operation failed with `invalid_request` on `market` unless you opened **Options**
+  and added **Market** by hand. Nesika requires a market on every Commerce request, and the node
+  only sent one when that option was present, so the default path never worked.
+- **Market** is now a field of its own on Search, Resolve, Find Offers and Deep Search, marked
+  required and defaulting to `AU`. It no longer sits inside the Options collections.
+
 ## 0.1.3
 
 - README fix only. The Operations heading said four operations while five were documented,

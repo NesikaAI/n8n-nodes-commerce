@@ -316,6 +316,19 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 		],
 	},
 
+	// ------------------------------------------------------- Market
+	{
+		displayName: 'Market',
+		name: 'market',
+		type: 'string',
+		required: true,
+		default: 'AU',
+		placeholder: 'AU',
+		displayOptions: { show: { resource: ['product'], operation: ALL_OPERATIONS } },
+		description:
+			'Country whose retailers Nesika searches, as a two letter ISO 3166-1 code, for example "AU", "GB" or "US". Write "UK" and the node sends "GB". Nesika requires this on every call.',
+	},
+
 	// ------------------------------------------------------- Shared options
 	{
 		displayName: 'Options',
@@ -332,15 +345,6 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 				default: '',
 				placeholder: 'headphones, audio',
 				description: 'Comma-separated words that narrow the search',
-			},
-			{
-				displayName: 'Market',
-				name: 'market',
-				type: 'string',
-				default: 'AU',
-				placeholder: 'AU',
-				description:
-					'Country whose retailers Nesika searches, as a two letter ISO 3166-1 code, for example "AU", "GB", "US", "DE" or "JP". Any country code works. Write "UK" and the node sends "GB", because "UK" is not a country code and the API refuses it.',
 			},
 			{
 				displayName: 'Maximum Price',
@@ -383,15 +387,6 @@ export const nesikaCommerceProperties: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['product'], operation: ['resolve'] } },
 		options: [
-			{
-				displayName: 'Market',
-				name: 'market',
-				type: 'string',
-				default: 'AU',
-				placeholder: 'AU',
-				description:
-					'Country whose retailers Nesika searches, as a two letter ISO 3166-1 code, for example "AU", "GB" or "US". Write "UK" and the node sends "GB".',
-			},
 			{
 				displayName: 'Retailer',
 				name: 'merchantId',
