@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5
+
+- Fixed: a repeated call returned job metadata instead of the products. Reusing an idempotency
+  key makes Nesika answer `200` with the first job, result and all, rather than `202`, and the
+  node passed that envelope straight through. A replayed call now splits into items exactly like
+  a fresh one. n8n retries reuse the key, so this is the retry path.
+
 ## 0.1.4
 
 - Fixed: every operation failed with `invalid_request` on `market` unless you opened **Options**

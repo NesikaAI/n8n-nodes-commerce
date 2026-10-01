@@ -302,6 +302,30 @@ describe('building request bodies', () => {
 		}
 	});
 
+	it('splits a replayed call the same way as a fresh one', async () => {
+		// Reusing an idempotency key makes Nesika answer 200 with the first job, result and all,
+		// instead of 202. Returning that envelope handed the workflow one item of job metadata
+		// where a fresh call hands it the products.
+		const { items } = await run({
+			parameters: { resource: 'product', operation: 'search', query: 'air fryer' },
+			responses: [
+				{
+					statusCode: 200,
+					body: {
+						job_id: 'job_replayed',
+						status: 'succeeded',
+						operation: 'search_products',
+						result: { candidates: [{ title: 'one' }, { title: 'two' }] },
+					},
+				},
+			],
+		});
+
+		expect(items).toHaveLength(2);
+		expect(items[0].json).toMatchObject({ title: 'one' });
+		expect(items[1].json).toMatchObject({ title: 'two' });
+	});
+
 	it('refuses a Find Offers call that names no product', async () => {
 		await expect(
 			run({

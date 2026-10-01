@@ -201,6 +201,13 @@ export async function getJob(
  * gateway keeps a connection open. Submitting with `Prefer: respond-async` avoids that:
  * the API answers with a job, and this function polls until the job finishes.
  */
+/** Recognises a Commerce job envelope, which carries a job id and a status. */
+function asJob(body: IDataObject): CommerceJob | undefined {
+	return typeof body.job_id === 'string' && typeof body.status === 'string'
+		? (body as CommerceJob)
+		: undefined;
+}
+
 export async function runOperation(
 	context: IExecuteFunctions,
 	parameters: {
@@ -223,9 +230,24 @@ export async function runOperation(
 		},
 	});
 
-	// The job finished inside the inline wait, so the body is already the result.
+	// A 200 means the work is already done: either the job finished inside the inline wait, or
+	// this idempotency key was used before and Nesika replayed the first answer for free. Both
+	// come back as a job envelope, so unwrap it. Returning the envelope here would hand the
+	// workflow one item of job metadata where a fresh call hands it the products.
 	if (submission.statusCode === 200) {
-		return { response: submission.body, usage: readUsage(submission) };
+		const body = submission.body;
+		const finishedJob = asJob(body);
+		if (!finishedJob) {
+			return { response: body, usage: readUsage(submission) };
+		}
+		if (finishedJob.status === 'succeeded' && finishedJob.result) {
+			return { response: finishedJob.result, job: finishedJob, usage: readUsage(submission) };
+		}
+		if (!parameters.waitForCompletion) {
+			return { response: finishedJob, job: finishedJob, usage: readUsage(submission) };
+		}
+		const settled = await pollJob(context, { ...parameters, job: finishedJob });
+		return { response: settled.result, job: settled.job, usage: readUsage(submission) };
 	}
 
 	if (submission.statusCode !== 202) {
